@@ -43,6 +43,7 @@ Open:
 - Prometheus UI: http://localhost:9090
 - Targets page: http://localhost:9090/targets
  - Alertmanager UI: http://localhost:9093
+ - Grafana UI: http://localhost:3000 (admin/admin)
 
 Generate some traffic:
 
@@ -130,6 +131,52 @@ To scrape your own apps in Kubernetes, you typically add `ServiceMonitor` resour
 - Request counter: `app_requests_total`
 - Rate (per second): `rate(app_requests_total[1m])`
 - P95-ish latency: `histogram_quantile(0.95, sum by (le) (rate(app_request_duration_seconds_bucket[5m])))`
+
+## Grafana: variables, data sources, links, tags
+This lab includes Grafana pre-provisioned with a Prometheus data source and an example dashboard:
+- Datasource provisioning: [grafana/provisioning/datasources/datasource.yml](grafana/provisioning/datasources/datasource.yml)
+- Dashboard provisioning: [grafana/provisioning/dashboards/dashboards.yml](grafana/provisioning/dashboards/dashboards.yml)
+- Example dashboard JSON: [grafana/dashboards/prometheus-hands-on.json](grafana/dashboards/prometheus-hands-on.json)
+
+### Variables (dropdowns)
+Variables make dashboards dynamic and reusable (one dashboard, many servers/environments).
+In the example dashboard you’ll see:
+- **Query variable**: `instance` (populated from Prometheus via `label_values(up, instance)`)
+- **Custom variable**: `environment` (`dev,staging,prod`)
+- **Constant variable**: `cluster` (hidden; set to `demo`)
+- **Interval variable**: `interval` (`1m,5m,15m,1h`) for use in `rate(...[$interval])`
+- **Datasource variable**: `datasource` so the same dashboard can switch Prometheus backends
+
+Use variables in PromQL like: `node_cpu_seconds_total{instance=~"$instance"}` and in titles like: `CPU Usage - $instance ($environment)`.
+
+### Data sources
+Grafana data sources define where Grafana fetches data from.
+This lab provisions Prometheus with URL `http://prometheus:9090` (server-side access).
+
+### Links
+Links guide investigation paths.
+The example dashboard includes top-level links to Alertmanager and Prometheus.
+
+### Tags
+Tags help organize dashboards (team/env/tech/criticality). The example dashboard is tagged with `hands-on`, `prometheus`, `grafana`, `demo`.
+
+### Dashboard JSON import/export
+Grafana dashboards are stored as JSON (panels, queries, variables, layout).
+Common workflow:
+- Export (copy JSON) → store in git → import into another Grafana → map data sources
+
+## Quiz answers (Grafana)
+- Manager wants one dashboard with a dropdown for server CPU: **C. Variables**
+- Variable type that fetches values from Prometheus: **C. Query variable**
+- Primary role of a data source: **C. Define where Grafana fetches data from**
+- Best practice for data source security: **C. Restrict sensitive data sources**
+- Where dashboard links appear: **C. At the top of a dashboard**
+- Common use of external links: **C. Opening incident runbooks**
+- Tags statement: **C. A dashboard can have multiple tags**
+- Panel definition: **B. A single visualization of data**
+- Dashboard versioning advantage: **C. Ability to roll back and audit changes**
+- Valid way to export dashboard JSON: **B. Copy JSON to clipboard**
+- Practice that helps prevent reuse issues: **C. Maintaining JSON in version control**
 
 ## Quick quiz answers
 - 3 AM receiving 500 alerts for a single issue mainly indicates: **B. Lack of alert grouping and deduplication**

@@ -1,0 +1,173 @@
+{
+  "uid": "prometheus-hands-on",
+  "title": "Prometheus Hands-on (Variables Demo)",
+  "tags": ["hands-on", "prometheus", "grafana", "demo"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "links": [
+    {
+      "type": "link",
+      "title": "Alertmanager (local)",
+      "url": "http://localhost:9093",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Prometheus (local)",
+      "url": "http://localhost:9090",
+      "targetBlank": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        }
+      },
+      {
+        "type": "query",
+        "name": "instance",
+        "label": "Instance",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "type": "custom",
+        "name": "environment",
+        "label": "Environment",
+        "query": "dev,staging,prod",
+        "current": {
+          "selected": false,
+          "text": "dev",
+          "value": "dev"
+        }
+      },
+      {
+        "type": "constant",
+        "name": "cluster",
+        "label": "Cluster",
+        "hide": 2,
+        "query": "demo",
+        "current": {
+          "selected": false,
+          "text": "demo",
+          "value": "demo"
+        }
+      },
+      {
+        "type": "interval",
+        "name": "interval",
+        "label": "Interval",
+        "query": "1m,5m,15m,1h",
+        "auto": false,
+        "current": {
+          "selected": false,
+          "text": "5m",
+          "value": "5m"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "CPU Usage - $instance ($environment)",
+      "id": 1,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\",instance=~\"$instance\"}[$interval])) * 100)",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Used - $instance",
+      "id": 2,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\"$instance\"} / node_memory_MemTotal_bytes{instance=~\"$instance\"})) * 100",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Flask Request Rate (per sec) - cluster=$cluster",
+      "id": 3,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(app_requests_total[$interval]))",
+          "legendFormat": "req/s"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Alertmanager Webhook Notifications (rate) - receiver",
+      "id": 4,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (receiver) (rate(alertmanager_notifications_total[$interval]))",
+          "legendFormat": "{{receiver}}"
+        }
+      ]
+    }
+  ]
+}
