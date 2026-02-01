@@ -42,6 +42,7 @@ docker compose up --build -d
 Open:
 - Prometheus UI: http://localhost:9090
 - Targets page: http://localhost:9090/targets
+ - Alertmanager UI: http://localhost:9093
 
 Generate some traffic:
 
@@ -59,6 +60,61 @@ Notes:
 - Prometheus scrapes other containers using compose service names (`prometheus`, `node-exporter`, `flask-app`) via [prometheus/prometheus.yml](prometheus/prometheus.yml).
 - On Windows Docker Desktop, the `node-exporter` container reports container-level metrics (not full host metrics). On Linux, you can bind-mount host paths and use `pid: host` if you want true host metrics.
 
+## Alerting: Grouping, dedup, routing
+This lab includes Alertmanager with grouping + routing enabled:
+- Alertmanager config: [alertmanager/alertmanager.yml](alertmanager/alertmanager.yml)
+- Prometheus alert rules: [prometheus/alerts.yml](prometheus/alerts.yml)
+
+### Grouping and deduplication
+If 50 pods fail to connect to the same DB, you usually want *one* notification with context (not 50 separate pages).
+
+In Alertmanager, grouping is controlled by the top-level `route`:
+- `group_by`: labels that define “same incident” (this repo uses `alertname`, `cluster`, `service`)
+- `group_wait`: wait to collect related alerts before first notification
+- `group_interval`: wait before sending more alerts for an existing group
+- `repeat_interval`: resend cadence for ongoing firing alerts
+
+Alertmanager also deduplicates alerts with identical label sets.
+
+### Test it (simulate an alert storm)
+1) Watch notifications arriving (grouped) in the Flask container logs:
+
+```bash
+docker logs -f flask-app
+```
+
+2) In another terminal, send a burst of alerts (includes duplicates to show dedup):
+
+```powershell
+./send-test-alerts.ps1
+```
+
+Wait ~10–15 seconds (`group_wait`) and you should see a small number of webhook deliveries even though many alerts were posted.
+
+If you re-run the script immediately, Alertmanager may *not* send a new notification until `group_interval`/`repeat_interval`.
+To force a fresh group for a new run:
+
+```powershell
+./send-test-alerts.ps1 -RunId (Get-Date -Format yyyyMMdd-HHmmss)
+```
+
+### Routing and receivers
+Routing is a tree (like triage): match labels and send to different receivers.
+
+This lab routes:
+- `severity=critical` → `pagerduty-critical` receiver
+- `team=database` → `database-team` receiver
+
+For simplicity, all receivers use a webhook pointing at the Flask app (`/alert`).
+
+### Silences and inhibition
+- **Silences**: temporary muting during planned maintenance (created in the Alertmanager UI or API).
+- **Inhibition**: suppresses “symptom” alerts when a “cause” alert is firing (example included in the config).
+
+### High availability (notes)
+Alertmanager clustering uses a gossip protocol so that multiple instances share state and only one sends each notification.
+For real HA, run at least 3 instances and configure Prometheus to send to all of them.
+
 ## Method 3: Kubernetes (Helm)
 Install the community chart:
 
@@ -74,3 +130,7 @@ To scrape your own apps in Kubernetes, you typically add `ServiceMonitor` resour
 - Request counter: `app_requests_total`
 - Rate (per second): `rate(app_requests_total[1m])`
 - P95-ish latency: `histogram_quantile(0.95, sum by (le) (rate(app_request_duration_seconds_bucket[5m])))`
+
+## Quick quiz answers
+- 3 AM receiving 500 alerts for a single issue mainly indicates: **B. Lack of alert grouping and deduplication**
+- Alertmanager component responsible for suppressing alerts during maintenance: **C. Silencer**

@@ -1,0 +1,27 @@
+groups:
+  - name: example-alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          cluster: demo
+          service: node
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage above 80% for 5 minutes"
+
+      - alert: FlaskAppDown
+        expr: up{job="flask_app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          cluster: demo
+          service: flask
+        annotations:
+          summary: "Flask app is down"
+          description: "Prometheus cannot scrape flask-app metrics for 1 minute"
